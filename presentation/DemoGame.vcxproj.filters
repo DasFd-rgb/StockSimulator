@@ -1,0 +1,119 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="Source Files" />
+    <Filter Include="Header Files" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="../shared/src/company.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/gameControl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/history.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/input.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/listing.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/market.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/order.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/portfolio.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/random.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/saveLoad.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/screenOut.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/session.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/stockPrice.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/stockQuery.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../shared/src/trade.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="presentation.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="../shared/include/common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/company.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/gameConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/gameControl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/gameData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/history.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/listing.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/market.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/order.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/portfolio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/random.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/saveLoad.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/screenOut.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/session.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/stockPrice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/stockQuery.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../shared/include/trade.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="presentation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
