@@ -18,13 +18,18 @@
 #include <wchar.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+/* [windows.h 학습] DWORD는 부호 없는 32비트 정수, BOOL은 Windows 참/거짓 값,
+ * HANDLE은 운영체제가 관리하는 자원의 식별값입니다. W로 끝나는 함수는 wchar_t 문자열을 받습니다.
+ * GetTickCount64는 부팅 후 밀리초를 반환하여 시스템 시각 변경과 무관하게 간격을 잽니다.
+ * SetConsoleCtrlHandler는 Ctrl+C 때 호출될 함수를 등록합니다. 처리기는 표시만 바꾸고
+ * main.c가 평소 흐름에서 저장하도록 합니다. InterlockedExchange는 표시를 안전하게 바꿉니다. */
 static HANDLE game_lock = INVALID_HANDLE_VALUE;
 static volatile LONG stop_requested;
 /** [학습 설명]
  * 함수: console_handler
  * Ctrl+C/Break를 받으면 종료 요청 표시만 설정합니다. 이 처리기에서 파일을 저장하지 않습니다.
  * 매개변수:
- * - event: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
+ * - event: Windows가 전달하는 Ctrl+C, Ctrl+Break 등의 종료 이벤트 종류.
  * 반환: 위 설명의 계산값·위치·처리 결과. 특수값의 의미도 위 설명을 확인합니다.
  */
 static BOOL WINAPI console_handler(DWORD event)
@@ -38,8 +43,8 @@ static BOOL WINAPI console_handler(DWORD event)
 }
 /** [학습 설명]
  * 함수: now_ms
- * 시스템의 단조 증가 시간을 밀리초로 읽습니다.
- * 반환: 위 설명의 계산값·위치·처리 결과. 특수값의 의미도 위 설명을 확인합니다.
+ * GetTickCount64로 부팅 이후 흐른 시간을 읽습니다.
+ * 반환: 밀리초 단위의 부호 없는 64비트 정수. main과 이전 시각의 차이를 계산합니다.
  */
 static uint64_t now_ms(void)
 {
@@ -48,10 +53,11 @@ static uint64_t now_ms(void)
 /** [학습 설명]
  * 함수: session_close
  * 원래 화면을 복구하고 동시 실행 방지용 뮤텍스를 닫습니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void session_close(void)
 {
+    (void)SetConsoleCtrlHandler(console_handler, FALSE);
     screen_shutdown();
     if (game_lock != INVALID_HANDLE_VALUE)
         CloseHandle(game_lock);
@@ -67,13 +73,22 @@ void session_close(void)
  */
 static bool lock_save(const char *path)
 {
-    wchar_t full[2048], name[96];
+    /* wchar_t는 이 Windows 환경에서 2바이트 문자 단위입니다.
+     * UTF-8 경로를 Windows W 함수가 받는 문자열로 바꾼 후 전체 경로를 구합니다. */
+    wchar_t relative[2048], full[2048], name[96];
     uint64_t hash = UINT64_C(14695981039346656037);
-    DWORD count = GetFullPathNameW(L"data/game_v4.sav", 2048, full, NULL);
+    DWORD count;
     size_t i;
-    (void)path;
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, relative, 2048))
+        return false;
+    /* DWORD는 Windows의 부호 없는 32비트 정수입니다.
+     * 결과 경로는 full, 성공 시 경로 길이는 count에 들어갑니다.
+     * 마지막 NULL은 파일명 부분의 위치를 별도로 받지 않겠다는 뜻입니다. */
+    count = GetFullPathNameW(relative, 2048, full, NULL);
     if (!count || count >= 2048)
         return false;
+    /* full[i]가 문자열 끝의 L'\0'(값 0)이 되면 반복을 멈춥니다.
+     * 영문 대소문자를 맞춘 뒤 FNV-1a 방식으로 잠금 이름용 숫자를 만듭니다. */
     for (i = 0; full[i]; ++i)
     {
         wchar_t ch = full[i];
@@ -83,6 +98,9 @@ static bool lock_save(const char *path)
         hash *= UINT64_C(1099511628211);
     }
     (void)swprintf(name, 96, L"Local\\StockGame_%llu", (unsigned long long)hash);
+    /* HANDLE은 Windows 자원을 가리키는 식별값입니다.
+     * NULL은 기본 보안 속성, FALSE는 생성 즉시 소유권을 요청하지 않음입니다.
+     * 이 프로그램은 이름의 존재로 동시 실행을 감지하고 CloseHandle로 해제합니다. */
     game_lock = CreateMutexW(NULL, FALSE, name);
     if (!game_lock)
     {
@@ -103,7 +121,7 @@ static bool lock_save(const char *path)
  * 매개변수:
  * - app: 시간·입력·화면과 게임을 묶어 보관하는 실행 상태의 주소.
  * - text: 검사하거나 표시할 문자열. 호출자가 내용과 종료 문자를 준비합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void say(Session *app, const char *text)
 {
@@ -138,7 +156,7 @@ bool session_checkpoint(Session *app)
  * 않으며, 입력 확정 직전에도 호출합니다.
  * 매개변수:
  * - app: 시간·입력·화면과 게임을 묶어 보관하는 실행 상태의 주소.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void session_advance_time(Session *app)
 {
@@ -175,6 +193,7 @@ void session_advance_time(Session *app)
  */
 static bool positive(const char *text, uint64_t *value, uint64_t maximum)
 {
+    /* &&는 왼쪽부터 검사합니다. 숫자 해석 성공 후에만 *value를 비교합니다. */
     return input_uint(text, value) && *value > 0 && *value <= maximum;
 }
 /* 일반용 다시하기 확인 뒤에만 호출합니다.
@@ -251,10 +270,15 @@ static bool execute_order(Session *app, char *tokens[], size_t count)
 
     if (result == RESULT_OK && limit)
     {
+        uint32_t i;
+        bool pending = false;
         char text[256];
+        for (i = 0; i < app->game.order_count; ++i)
+            if (app->game.orders[i].id == order_id)
+                pending = true;
         (void)snprintf(text, sizeof(text),
-                       "주문 ID %" PRIu64 " 접수. 조건 만족 시 현재가로 체결됩니다. o/t로 확인하세요.",
-                       order_id);
+                       "주문 ID %" PRIu64 " %s o/t로 확인하세요.", order_id,
+                       pending ? "미체결 대기 중입니다." : "즉시 체결되었습니다.");
         say(app, text);
     }
     else
@@ -269,7 +293,7 @@ static bool execute_order(Session *app, char *tokens[], size_t count)
  * 사용자가 고르는 저장·불러오기 메뉴는 없습니다.
  * 매개변수:
  * - app: 시간·입력·화면과 게임을 묶어 보관하는 실행 상태의 주소.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void session_command(Session *app)
 {
@@ -307,7 +331,19 @@ void session_command(Session *app)
     }
     app->restart_pending = false;
 
-    if (!strcmp(tokens[0], "b") || !strcmp(tokens[0], "s") || !strcmp(tokens[0], "lb") ||
+    /* ack는 현재까지의 폐지 알림을 확인합니다. 거래 기록은 그대로 보관합니다.
+     * 저장 실패 시 안내하고 다음 복구 기록에서 재시도합니다. */
+    if (!strcmp(tokens[0], "ack") && count == 1)
+    {
+        app->game.delist_notice_count = 0;
+        app->game.delist_notice_total = 0;
+        app->game.delist_notice_loss = 0;
+        memset(app->game.delist_notices, 0, sizeof(app->game.delist_notices));
+        app->screen.page = 0;
+        changed = true;
+        say(app, "상장폐지 알림을 확인했습니다. t에서 거래 기록을 볼 수 있습니다.");
+    }
+    else if (!strcmp(tokens[0], "b") || !strcmp(tokens[0], "s") || !strcmp(tokens[0], "lb") ||
         !strcmp(tokens[0], "ls"))
         changed = execute_order(app, tokens, count); /* order.c와 연결 */
     else if (!strcmp(tokens[0], "cancel"))
@@ -489,8 +525,8 @@ bool session_open(Session *app, uint32_t interval_ms, uint64_t seed)
     }
     app->control.interval_ms = interval_ms;
     app->screen.interval_ms = interval_ms;
-    app->save_path = "data/game_v4.sav";
-    (void)SetConsoleOutputCP(CP_UTF8);
+    app->save_path = SAVE_PATH; /* gameConfig.h의 단일 저장 경로 */
+    screen_init(); /* screenOut.c: 원래 코드 페이지를 먼저 보관한 뒤 UTF-8 설정 */
     if (!lock_save(app->save_path))
     {
         fputs("같은 게임이 이미 실행 중이거나 저장 경로를 사용할 수 없습니다.\n", stderr);
@@ -521,7 +557,6 @@ bool session_open(Session *app, uint32_t interval_ms, uint64_t seed)
             app->game.remaining_ms = interval_ms;
         say(app, loaded == LOAD_BACKUP ? error : "저장된 시점부터 자동으로 이어서 시작합니다.");
     }
-    screen_init();
     (void)SetConsoleCtrlHandler(console_handler, TRUE);
     app->last_clock = app->last_checkpoint = now_ms();
     app->redraw = true;

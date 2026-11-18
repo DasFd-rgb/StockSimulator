@@ -12,6 +12,15 @@
 #include <stdarg.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+/* [windows.h 학습] GetStdHandle은 기존 콘솔의 HANDLE을 가져옵니다.
+ * CONSOLE_SCREEN_BUFFER_INFO는 창 크기/위치 정보, COORD는 문자 칸의 x/y 좌표,
+ * SMALL_RECT는 왼쪽/위/오른쪽/아래 경계입니다. 좌표는 픽셀이 아닌 문자 칸입니다.
+ * CreateConsoleScreenBuffer가 새 화면을 만들고 SetConsoleActiveScreenBuffer로 보여 줍니다.
+ * 생성 실패 시 INVALID_HANDLE_VALUE를 반환합니다. 기존 화면을 쓰는 대체 경로도 있습니다.
+ * MultiByteToWideChar(CP_UTF8, ...)는 UTF-8 문자열을 wchar_t 배열로 바꿉니다.
+ * WriteConsoleW는 현재 커서부터 j개 문자 단위를 출력하고 written에 실제 출력 수를 씁니다.
+ * SetConsoleCursorPosition으로 같은 행에 덮어쓰므로 전체 지우기의 깜빡임을 줄입니다.
+ * 종료 시 원래 화면과 코드 페이지를 복원하고 직접 만든 HANDLE만 CloseHandle로 닫습니다. */
 #define SCREEN_ROWS 24
 #define ROW_BYTES 768
 #define PAGE_SIZE 10U
@@ -30,7 +39,7 @@ static bool console_output;
  * 한 화면에 출력할 UTF-8 행을 준비합니다.
  * 매개변수:
  * - format: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void row(const char *format, ...)
 {
@@ -72,7 +81,7 @@ const char *format_money(int64_t value, char buffer[48])
  * 함수: screen_init
  * 가능하면 전용 Windows 콘솔 화면 버퍼를 만들고 활성화합니다. ANSI 지우기 명령에 의존하지 않습니다. 새 버퍼 생성 실패 시
  * 기존 콘솔 버퍼에 고정 위치로 출력합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void screen_init(void)
 {
@@ -119,7 +128,7 @@ void screen_init(void)
 /** [학습 설명]
  * 함수: screen_shutdown
  * 원래 콘솔 화면으로 복귀하고 생성한 화면 버퍼를 닫습니다. 프로그램 종료 처리에서 호출합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void screen_shutdown(void)
 {
@@ -165,7 +174,7 @@ static size_t first_row(size_t count, size_t page)
  * 매개변수:
  * - count: 현재 유효한 항목 개수. 배열 최대 크기와 구분합니다.
  * - start: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void page_label(size_t count, size_t start)
 {
@@ -192,7 +201,7 @@ static int64_t position_value(const Game *game, size_t slot)
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
  * - state: 선택한 화면·검색·정렬·페이지 등 화면 상태.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void market_view(const Game *game, const ScreenState *state)
 {
@@ -224,14 +233,14 @@ static void market_view(const Game *game, const ScreenState *state)
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
  * - state: 선택한 화면·검색·정렬·페이지 등 화면 상태.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void detail_view(const Game *game, const ScreenState *state)
 {
     int slot = company_find(game, state->selected_id);
     size_t i, start, count;
     int64_t low, high;
-    char a[48], b[48];
+    char a[48], b[48], delta[48];
     const Company *c;
     if (slot < 0)
     {
@@ -245,8 +254,12 @@ static void detail_view(const Game *game, const ScreenState *state)
         c->profit_bp / 100.0, c->debt_percent);
     row("매출 %s백만원 | 업종 영향 %+.2f%% | 재무 정보는 %d회 갱신마다 변경",
         format_money(c->revenue_million, a), game->sector_bp[c->sector] / 100.0, FINANCE_INTERVAL);
-    row("가상의 %s 분야 기업입니다. 수익성과 부채, 업종 상황이 가격 변동에 반영됩니다.",
-        sector_name(c->sector));
+    {
+        int64_t previous = c->prices[c->price_count > 1 ? c->price_count - 2 : 0];
+        row("직전 가격 %s원 | 직전 대비 %s원 (%+.2f%%)", format_money(previous, a),
+            format_money(c->price - previous, b),
+            (double)(c->price - previous) * 100.0 / previous);
+    }
     count = c->price_count < 60 ? c->price_count : 60;
     start = c->price_count - count;
     low = high = c->prices[start];
@@ -259,6 +272,11 @@ static void detail_view(const Game *game, const ScreenState *state)
     }
     row("최근 %zu개 가격 | 최저 %s / 최고 %s원 (위쪽이 높은 가격)", count, format_money(low, a),
         format_money(high, b));
+    row("구간 시작 %s원 → 현재 %s원 | 변화 %s원 (%+.2f%%)",
+        format_money(c->prices[start], a), format_money(c->price, b),
+        format_money(c->price - c->prices[start], delta),
+        (double)(c->price - c->prices[start]) * 100.0 / c->prices[start]);
+    row("세로축 원 단위 | 매 화면에서 최저~최고로 자동 조정 | * 실제 가격 위치");
     {
         int level;
         for (level = 6; level >= 0; --level)
@@ -271,19 +289,45 @@ static void detail_view(const Game *game, const ScreenState *state)
                 chart[i] = point == level ? '*' : ' ';
             }
             chart[count] = '\0';
-            row("|%s", chart);
+            /* 정수 계산 범위 안에서 7개 가격 눈금을 만듭니다.
+             * 모든 가격이 같으면 같은 눈금을 표시하고 가운데 줄에 점을 찍습니다. */
+            row("%15s |%s", format_money(low + (high - low) * level / 6, a), chart);
         }
     }
-    row("+------------------------------------------------------------> 시간");
+    row("                +------------------------------------------------------------> 시간");
     row("watch ID: 관심 전환 | b/s ID 수량: 시장가 | lb/ls ID 수량 가격: 지정가");
 }
+/* [관련 모듈] trade.c/history.c에서 보관한 미확인 폐지 알림을 읽습니다.
+ * 시장은 계속 갱신됩니다. ack 전까지 이 화면이 일반 화면보다 먼저 표시됩니다.
+ * 30건을 넘으면 최근 상세와 전체 미확인 건수/손실 합계를 함께 보여 줍니다. */
+static void delist_notices_view(const Game *game, const ScreenState *state)
+{
+    size_t start = state->page * 5, i;
+    size_t count = game->delist_notice_count;
+    char a[48], b[48];
+    if (start >= count)
+        start = (count - 1) / 5 * 5;
+    row("[보유 종목 상장폐지] 미확인 %" PRIu64 "건 | 손실 합계 %s원",
+        game->delist_notice_total, format_money(game->delist_notice_loss, a));
+    row("최근 %u건 상세 | page 번호로 이동 | ack로 현재 알림 전체 확인", game->delist_notice_count);
+    for (i = start; i < count && i < start + 5; ++i)
+    {
+        const TradeRecord *t = &game->delist_notices[count - 1 - i];
+        row("%s (ID %" PRIu64 ") | 발생 갱신 # %" PRIu64, t->name, t->company_id, t->tick);
+        row("보유 %s주 소멸 | 확정 손실 %s원", format_money(t->quantity, a),
+            format_money(-t->realized, b));
+    }
+    row("알림 페이지 %zu/%zu | t 거래 내역은 ack 이후에도 보관됩니다.", start / 5 + 1,
+        (count + 4) / 5);
+}
+
 /** [학습 설명]
  * 함수: portfolio_view
  * 수량·매도 가능 수량·평균 원가·평가 손익을 표시합니다.
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
  * - state: 선택한 화면·검색·정렬·페이지 등 화면 상태.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void portfolio_view(const Game *game, const ScreenState *state)
 {
@@ -318,7 +362,7 @@ static void portfolio_view(const Game *game, const ScreenState *state)
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
  * - state: 선택한 화면·검색·정렬·페이지 등 화면 상태.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void orders_view(const Game *game, const ScreenState *state)
 {
@@ -343,7 +387,7 @@ static void orders_view(const Game *game, const ScreenState *state)
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
  * - state: 선택한 화면·검색·정렬·페이지 등 화면 상태.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void trades_view(const Game *game, const ScreenState *state)
 {
@@ -372,7 +416,7 @@ static void trades_view(const Game *game, const ScreenState *state)
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
  * - state: 선택한 화면·검색·정렬·페이지 등 화면 상태.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void assets_view(const Game *game, const ScreenState *state)
 {
@@ -395,14 +439,14 @@ static void assets_view(const Game *game, const ScreenState *state)
  * 현재 실행 프로그램의 실제 갱신 간격과 수수료 설정, 일반 명령을 표시합니다. 수동 저장 명령은 안내하지 않습니다.
  * 매개변수:
  * - state: 선택한 화면·검색·정렬·페이지 등 화면 상태.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void help_view(const ScreenState *state)
 {
     row("[도움말] 명령은 영문 소문자, 입력 후 Enter. 가격은 입력 중에도 %u초마다 갱신.",
         (state->interval_ms ? state->interval_ms : TICK_MS) / 1000);
     row("l: 종목 목록 | d ID: 회사 상세와 차트 | p: 보유 자산 | o: 미체결 주문");
-    row("t: 거래 내역 | a: 자산 기록 | h: 도움말 | page 번호: 페이지 이동");
+    row("t: 거래 내역 | a: 자산 기록 | h: 도움말 | page 번호: 페이지 이동 | ack: 폐지 알림 확인");
     row("b ID 수량 / s ID 수량: 시장가 매수 / 매도");
     row("lb ID 수량 가격 / ls ID 수량 가격: 지정가 매수 / 매도");
     row("cancel 주문ID: 미체결 취소 | watch ID: 관심 등록/해제 | watches: 관심 목록");
@@ -421,7 +465,7 @@ static void help_view(const ScreenState *state)
  * 함수: paint
  * 이전 문자열과 달라진 행만 공백을 덧붙여 같은 좌표에 덮어씁니다. 줄바꿈 출력이 화면을 밀지 않게 폭을 제한하고 작은 창에서도 하단
  * 입력과 안내를 남깁니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 /* 이전 행 문자열과 비교해 바뀐 행만 덮어씁니다.
  * 짧아진 글자의 흔적은 뒤에 공백을 붙여 같은 출력 한 번으로 지웁니다.
@@ -505,7 +549,7 @@ static void paint(void)
  * - input: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
  * - save_failed: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
  * - save_path: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void screen_render(const Game *game, const ScreenState *state, const char *notice,
                    const char *input, bool save_failed, const char *save_path)
@@ -526,7 +570,7 @@ void screen_render(const Game *game, const ScreenState *state, const char *notic
             unrealized += value;
     }
     row("%s | 공포지수 %d/100 | 시장 상태: %s | 갱신 # %" PRIu64 " | 다음 %u초%s",
-        state->title ? state->title : "주식 모의투자 V2", game->fear,
+        state->title ? state->title : "주식 모의투자 V3", game->fear,
         market_phase_name(game->phase), game->tick_count, (game->remaining_ms + 999) / 1000,
         portfolio_bankrupt(game) ? " | 파산: 게임 종료" : "");
     row("총자산 %s%s원 | 현금 %s원 | 사용 가능 %s원", fits ? "" : "최소 ", format_money(total, a),
@@ -535,7 +579,9 @@ void screen_render(const Game *game, const ScreenState *state, const char *notic
         format_money(unrealized, b), save_failed ? "실패! q로 재시도" : "정상");
     row("------------------------------------------------------------------------------------------"
         "-");
-    switch (state->view)
+    if (game->delist_notice_count)
+        delist_notices_view(game, state);
+    else switch (state->view)
     {
     case VIEW_DETAIL:
         detail_view(game, state);
@@ -562,7 +608,23 @@ void screen_render(const Game *game, const ScreenState *state, const char *notic
     while (row_count < 18)
         row("");
     row("l 목록 | d ID 상세 | p 자산 | o 주문 | t 거래 | a 자산기록 | h 도움말 | q 종료");
-    row("%s", notice);
+    /* 현금이 조금 남아도 파산 조건은 충족하지 않습니다. 사용 가능 금액과
+     * 별도로 실제 현금으로 단 한 주라도 살 수 있는지 검사합니다. */
+    {
+        bool has_shares = false, can_buy = false;
+        int64_t cost;
+        for (i = 0; i < COMPANY_COUNT; ++i)
+        {
+            if (game->shares[i])
+                has_shares = true;
+            if (buy_cost(game->companies[i].price, 1, &cost) && cost <= game->cash)
+                can_buy = true;
+        }
+        if (!has_shares && !can_buy && !portfolio_bankrupt(game))
+            row("현재 매수 가능한 종목이 없습니다. %s", state->extra_help ? state->extra_help : "");
+        else
+            row("%s", notice);
+    }
     row("%s%s", state->paused ? "[일시정지] " : "",
         state->footer ? state->footer
                       : "q로 종료하면 저장됩니다. 다음 실행은 자동 이어 하기입니다.");

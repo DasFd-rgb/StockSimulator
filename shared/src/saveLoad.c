@@ -12,6 +12,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <io.h>
+/* [관련 모듈] session.c가 저장 시점을 결정하고 이 모듈이 파일을 검증/기록합니다.
+ * Windows FlushFileBuffers와 같은 디스크 반영을 _commit(_fileno(file))으로 요청합니다.
+ * _commit은 MSVC 함수이며 실패 시 -1입니다. 파일 쓰기와 fclose 결과도 함께 검사합니다.
+ * 저장 형식 번호 5와 프로그램 버전 V3는 서로 다른 목적의 번호입니다. */
 #define HEADER_SIZE 24U
 #define FILE_LIMIT (256U * 1024U)
 #define PATH_LIMIT 2048
@@ -82,7 +86,7 @@ bool game_validate(const Game *game, char *error, size_t size)
             c->sector >= SECTOR_COUNT || c->health < 0 || c->health > 100 || c->profit_bp < -3000 ||
             c->profit_bp > 3000 || c->debt_percent < 0 || c->debt_percent > 300 ||
             c->revenue_million < 1 || c->revenue_million > 1000000 || c->price <= DELIST_PRICE ||
-            c->price > MAX_PRICE || c->last_change_bp < -3000 || c->last_change_bp > 3000 ||
+            c->price > MAX_PRICE || c->last_change_bp < -3010 || c->last_change_bp > 3010 ||
             c->price_count < 1 || c->price_count > PRICE_HISTORY_MAX || game->shares[i] < 0 ||
             game->shares[i] > MAX_SHARES || !money_valid(game->cost_basis[i]) ||
             (game->shares[i] == 0 && game->cost_basis[i] != 0))
@@ -141,6 +145,20 @@ bool game_validate(const Game *game, char *error, size_t size)
             !money_valid(game->assets[i].total) || game->assets[i].total < game->assets[i].cash ||
             (i && game->assets[i].tick < game->assets[i - 1].tick))
             return fail(error, size, "자산 기록 오류입니다.");
+    if (game->delist_notice_count > DELIST_NOTICE_MAX ||
+        game->delist_notice_total < game->delist_notice_count ||
+        !money_valid(game->delist_notice_loss) ||
+        (game->delist_notice_count == 0 && game->delist_notice_total != 0))
+        return fail(error, size, "상장폐지 알림 개수 오류입니다.");
+    for (i = 0; i < game->delist_notice_count; ++i)
+    {
+        const TradeRecord *t = &game->delist_notices[i];
+        if (t->side != SIDE_DELIST || !t->company_id || t->company_id >= game->next_company_id ||
+            !company_name_valid(t->name) || t->tick > game->tick_count ||
+            t->quantity < 1 || t->quantity > MAX_SHARES || t->realized > 0 ||
+            t->realized < -MAX_MONEY || t->price || t->fee || t->tax || t->order_id)
+            return fail(error, size, "상장폐지 알림 내용 오류입니다.");
+    }
     if (error && size)
         error[0] = '\0';
     return true;
@@ -152,7 +170,7 @@ bool game_validate(const Game *game, char *error, size_t size)
  * - b: 바이너리 버퍼 주소(현재 위치·끝·성공 여부 포함).
  * - value: 계산·변환할 값 또는 계산 결과를 받을 출력 주소.
  * - bytes: 바이너리 바이트 배열 또는 기록할 정수의 바이트 수.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void write_number(Buffer *b, uint64_t value, unsigned int bytes)
 {
@@ -195,7 +213,7 @@ static uint64_t read_number(Buffer *b, unsigned int bytes)
  * 매개변수:
  * - b: 바이너리 버퍼 주소(현재 위치·끝·성공 여부 포함).
  * - value: 계산·변환할 값 또는 계산 결과를 받을 출력 주소.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void write_signed(Buffer *b, int64_t value)
 {
@@ -221,7 +239,7 @@ static int64_t read_signed(Buffer *b)
  * - b: 바이너리 버퍼 주소(현재 위치·끝·성공 여부 포함).
  * - name: 검사·출력·변환할 회사 이름 문자열.
  * - writing: true이면 기록 방향, false이면 복원 방향입니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 static void name_transfer(Buffer *b, char *name, bool writing)
 {
@@ -244,9 +262,9 @@ static void name_transfer(Buffer *b, char *name, bool writing)
  * - b: 바이너리 버퍼 주소(현재 위치·끝·성공 여부 포함).
  * - g: 바이너리로 변환하거나 복원할 게임 상태의 주소.
  * - writing: true이면 기록 방향, false이면 복원 방향입니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
-static void transfer(Buffer *b, Game *g, bool writing)
+static void transfer(Buffer *b, Game *g, bool writing, uint32_t version)
 {
     size_t i, j;
     uint64_t temp;
@@ -325,7 +343,7 @@ static void transfer(Buffer *b, Game *g, bool writing)
         SMALL(c->debt_percent, 0, 300);
         I64(c->revenue_million);
         I64(c->price);
-        SMALL(c->last_change_bp, -3000, 3000);
+        SMALL(c->last_change_bp, -3010, 3010);
         temp = c->watched ? 1 : 0;
         U64(temp);
         if (temp > 1)
@@ -373,6 +391,28 @@ static void transfer(Buffer *b, Game *g, bool writing)
         I64(g->assets[i].cash);
         I64(g->assets[i].total);
     }
+    /* 저장 형식 5부터 미확인 알림을 추가합니다. 형식 4는 기존 상태만 읽습니다. */
+    if (version >= 5)
+    {
+        U32(g->delist_notice_count);
+        U64(g->delist_notice_total);
+        I64(g->delist_notice_loss);
+        if (g->delist_notice_count > DELIST_NOTICE_MAX)
+        {
+            b->okay = false;
+            return;
+        }
+        for (i = 0; i < g->delist_notice_count && b->okay; ++i)
+        {
+            TradeRecord *t = &g->delist_notices[i];
+            U64(t->tick);
+            U64(t->company_id);
+            name_transfer(b, t->name, writing);
+            I64(t->quantity);
+            I64(t->realized);
+            t->side = SIDE_DELIST;
+        }
+    }
 #undef U64
 #undef U32
 #undef I64
@@ -412,18 +452,24 @@ static bool decode(unsigned char *bytes, size_t length, Game *game)
     uint64_t version, payload, hash;
     Game *next;
     bool okay;
-    if (length < HEADER_SIZE || memcmp(bytes, "STOCKV4", 8))
+    if (length < HEADER_SIZE ||
+        (memcmp(bytes, "STOCKV4", 8) && memcmp(bytes, "STOCKV5", 8)))
         return false;
     version = read_number(&buffer, 4);
     payload = read_number(&buffer, 4);
     hash = read_number(&buffer, 8);
-    if (version != SAVE_VERSION || payload != length - HEADER_SIZE ||
+    if ((version != 4 && version != SAVE_VERSION) ||
+        (version == 4 && memcmp(bytes, "STOCKV4", 8)) ||
+        (version == 5 && memcmp(bytes, "STOCKV5", 8)) || payload != length - HEADER_SIZE ||
         hash != checksum(bytes + HEADER_SIZE, length - HEADER_SIZE))
         return false;
     next = calloc(1, sizeof(*next));
     if (!next)
         return false;
-    transfer(&buffer, next, false);
+    transfer(&buffer, next, false, (uint32_t)version);
+    /* 예전 30초 저장도 복원합니다. 새 일반용의 최대 대기시간은 10초입니다. */
+    if (version == 4 && next->remaining_ms <= 30000 && next->remaining_ms > TICK_MS)
+        next->remaining_ms = TICK_MS;
     okay = buffer.okay && buffer.position == length && game_validate(next, NULL, 0);
     if (okay)
         *game = *next;
@@ -499,7 +545,7 @@ static bool path_with(char destination[PATH_LIMIT], const char *path, const char
 /* 검증과 직렬화 코드는 V2에서 재사용합니다. 파일 개수 정책만 아래에서 변경합니다. */
 /** [학습 설명]
  * 함수: encode_snapshot
- * 기존 필드별 바이너리 변환 코드를 재사용하여 바이트 배열을 만듭니다. 원본을 보호하기 위해 Game 복사본을 사용하며 헤더에 V4
+ * 기존 필드별 바이너리 변환 코드를 재사용하여 바이트 배열을 만듭니다. 원본을 보호하기 위해 Game 복사본을 사용하며 헤더에 저장 형식 5의
  * 버전·길이·손상 검사값을 씁니다.
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
@@ -514,12 +560,12 @@ static bool encode_snapshot(const Game *game, unsigned char *bytes, size_t *leng
     if (!copy)
         return false;
     *copy = *game;
-    transfer(&buffer, copy, true);
+    transfer(&buffer, copy, true, SAVE_VERSION);
     free(copy);
     if (!buffer.okay)
         return false;
     *length = buffer.position;
-    memcpy(bytes, "STOCKV4", 8);
+    memcpy(bytes, "STOCKV5", 8);
     buffer.position = 8;
     write_number(&buffer, SAVE_VERSION, 4);
     write_number(&buffer, *length - HEADER_SIZE, 4);

@@ -8,7 +8,7 @@
 
 typedef struct
 {
-    uint32_t interval_ms; /* 가격 갱신 간격: 일반 30000, 시연 3000 밀리초 */
+    uint32_t interval_ms; /* 가격 갱신 간격: 일반 10000, 시연 3000 밀리초 */
     bool paused;
 } RunControl;
 

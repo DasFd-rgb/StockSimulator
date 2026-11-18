@@ -5,32 +5,28 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-int main(int argc, char **argv)
+
+int main(void)
 {
     Session *app;
     uint32_t shown_seconds = UINT32_MAX;
     int exit_code = 0;
 
-    /* 허용하지 않는 실행 인수로 별도 저장 슬롯을 만들 수 없게 합니다. */
-    if (argc != 1)
-    {
-        puts("Stock simulator V2. Run without arguments. h: in-game help.");
-        return argc == 2 && !strcmp(argv[1], "--help") ? 0 : 1;
-    }
     /* Game 안의 이력 배열이 크므로 스택 대신 배운 동적 메모리를 사용합니다. */
     app = malloc(sizeof(*app));
+    /* malloc 실패 시 NULL을 받습니다. !app은 app == NULL과 같은 조건입니다. */
     if (!app)
-        return 1;
-    if (!session_open(app, 30000, 0))
+        return 1;       // 오류처리
+    if (!session_open(app, TICK_MS, 0))
     {
         session_close();
         free(app);
-        return 1;
+        return 1;       // 오류처리코드
     }
     /* session.c의 명령 처리에서 확인할 일반용 설정입니다. */
     app->restart_enabled = true;
     app->screen.extra_help = "restart: 새 게임 확인 | restart yes: 실행 | restart no: 취소";
-    app->screen.title = "주식 모의투자 V2";
+    app->screen.title = "주식 모의투자 V3";
     app->screen.footer = "restart: 다시하기 | q: 저장 후 종료";
     /* 일반용에는 시연 명령을 연결하지 않습니다. */
 
@@ -102,6 +98,7 @@ int main(int argc, char **argv)
             shown_seconds = seconds;
         }
         if (!app->quit)
+            /* windows.h의 Sleep은 밀리초 단위로 현재 실행을 잠깐 쉽니다. */
             Sleep(20); /* CPU를 계속 점유하지 않도록 잠깐 양보 */
     }
 

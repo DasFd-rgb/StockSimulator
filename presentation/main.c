@@ -6,20 +6,15 @@
 #include <windows.h>
 #include "presentation.h"
 
-int main(int argc, char **argv)
+int main(void)
 {
     Session *app;
     uint32_t shown_seconds = UINT32_MAX;
     int exit_code = 0;
 
-    /* 허용하지 않는 실행 인수로 별도 저장 슬롯을 만들 수 없게 합니다. */
-    if (argc != 1)
-    {
-        puts("Stock simulator V2. Run without arguments. h: in-game help.");
-        return argc == 2 && !strcmp(argv[1], "--help") ? 0 : 1;
-    }
     /* Game 안의 이력 배열이 크므로 스택 대신 배운 동적 메모리를 사용합니다. */
     app = malloc(sizeof(*app));
+    /* malloc 실패 시 NULL을 받습니다. !app은 app == NULL과 같은 조건입니다. */
     if (!app)
         return 1;
     if (!session_open(app, 3000, 42))
@@ -28,7 +23,7 @@ int main(int argc, char **argv)
         free(app);
         return 1;
     }
-    app->screen.title = "주식 모의투자 V2 시연판";
+    app->screen.title = "주식 모의투자 V3 시연판";
     app->screen.footer = "pause 정지 | resume 재개 | step 1회 진행 | h 도움말";
     app->screen.extra_help = "시연: pause / resume / step / event crash / event boom / event "
                              "delist ID / event fill 주문ID / reset";
@@ -98,6 +93,7 @@ int main(int argc, char **argv)
             shown_seconds = seconds;
         }
         if (!app->quit)
+            /* windows.h의 Sleep은 밀리초 단위로 현재 실행을 잠깐 쉽니다. */
             Sleep(20); /* CPU를 계속 점유하지 않도록 잠깐 양보 */
     }
 

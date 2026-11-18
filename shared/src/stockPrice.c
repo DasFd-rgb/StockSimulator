@@ -22,6 +22,7 @@ void stock_prices_update(Game *game, TickReport *report)
     for (i = 0; i < COMPANY_COUNT; ++i)
     {
         Company *c = &game->companies[i];
+        int64_t old_price = c->price; /* 표시와 상승/하락 판정의 기준 가격 */
         int spread = range[c->type];
         int finance = clamp(c->profit_bp / 600 - c->debt_percent / 120 + 1, -3, 3);
         int noise = random_signed(game, 0, spread) - random_signed(game, 0, spread);
@@ -34,15 +35,15 @@ void stock_prices_update(Game *game, TickReport *report)
             change += random_range(game, 0, 1) ? shock : -shock;
         }
         change = clamp(change, -3000, 3000);
-        c->last_change_bp = change;
         /* 정수 원 단위 반올림: 매번 버리면서 저가주가 불리해지는 편향을 줄입니다. */
         c->price = (c->price * (10000 + (int64_t)change) + 5000) / 10000;
         if (c->price > MAX_PRICE)
             c->price = MAX_PRICE;
+        c->last_change_bp = (int32_t)((c->price - old_price) * 10000 / old_price);
         history_price(c);
-        if (change > 0)
+        if (c->price > old_price)
             ++report->rising;
-        else if (change < 0)
+        else if (c->price < old_price)
             ++report->falling;
         else
             ++report->sideways;

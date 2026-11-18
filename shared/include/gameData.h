@@ -67,7 +67,7 @@ typedef struct
 } AssetRecord;
 typedef struct
 {
-    Company companies[COMPANY_COUNT];
+    Company companies[COMPANY_COUNT];  /*회사 구조체 배열*/
     int64_t shares[COMPANY_COUNT];     /* 회사 배열의 같은 위치와 연결된 보유 수량 */
     int64_t cost_basis[COMPANY_COUNT]; /* 매수 수수료 포함 잔여 총 원가 */
     int64_t cash;                      /* 실제 현금. 예약 시에는 줄이지 않음 */
@@ -88,7 +88,13 @@ typedef struct
     uint32_t trade_count; /* 최근 체결·폐지 기록 개수. 취소만 된 주문은 미포함 */
     AssetRecord assets[ASSET_HISTORY_MAX];
     uint32_t asset_count; /* 최근 자산 기록 개수. 초과하면 가장 오래된 기록 제거 */
-} Game;
+    /* history.c와 screenOut.c가 함께 사용합니다. ack 전까지 저장에도 남습니다.
+     * 상세는 최근 30건, 전체 건수와 손실 합계는 따로 유지합니다. */
+    TradeRecord delist_notices[DELIST_NOTICE_MAX];
+    uint32_t delist_notice_count;
+    uint64_t delist_notice_total;
+    int64_t delist_notice_loss;
+} Game; // 게임정보 구조체
 typedef enum
 {
     RESULT_OK,

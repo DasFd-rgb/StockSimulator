@@ -3,6 +3,8 @@
 #define HISTORY_H
 #include "gameData.h"
 /* 체결 또는 폐지 기록을 최근 256건 배열에 추가합니다. 가득 차면 가장 오래된 한 건을 memmove로 제거합니다. 미체결 등록이나 취소는 거래 체결 기록에 넣지 않습니다. */
+/* trade.c의 폐지 기록을 미확인 알림에도 보관합니다. 상세 최대 30건입니다. */
+void history_delist_notice(Game *game, const TradeRecord *record);
 void history_trade(Game *game, const TradeRecord *record);
 /* 현재 회차·현금·총자산을 최근 128건 배열에 추가합니다. 매매 후와 가격 갱신 완료 후 호출합니다. 총자산 계산 한도 초과 시 표시용 상한값을 기록합니다. */
 void history_asset(Game *game);

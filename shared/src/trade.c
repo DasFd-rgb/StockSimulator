@@ -107,6 +107,7 @@ void trade_delist(Game *game, size_t slot)
         record.realized = -game->cost_basis[slot];
         game->realized = bounded_add(game->realized, record.realized);
         history_trade(game, &record);
+        history_delist_notice(game, &record); /* history.c: 확인 전까지 별도 보관 */
     }
     game->shares[slot] = game->cost_basis[slot] = 0;
 }

@@ -503,7 +503,7 @@ static int test_console(void)
  * 테스트 실행 진입점입니다. 핵심 규칙·파일 정책·고정 화면을 검사하고 실패 즉시 위치를 알립니다.
  * 매개변수:
  * - argc: 실행 인수 개수. 일반 실행은 추가 인수가 없습니다.
- * - argv: 실행 인수 문자열 배열. --help 외의 선택 인수는 거절합니다.
+ * - argv: 테스트 폴더 또는 --dump, --console, --simulate 검증 옵션 문자열 배열.
  * 반환: 위 설명의 계산값·위치·처리 결과. 특수값의 의미도 위 설명을 확인합니다.
  */
 
@@ -667,10 +667,66 @@ static int simulate_market(void)
     return 0;
 }
 
+
+/* [V3 회귀 검사] 알림을 30건으로 제한하면서 전체 합계와 저장 복원을 검사합니다.
+ * test-data 폴더만 사용하므로 실제 플레이 저장은 변경하지 않습니다. */
+static void test_v3_notices(const char *directory)
+{
+    char path[2048], error[256];
+    TradeRecord record = {0};
+    TickReport report = {0};
+    unsigned int i;
+    game_init(&a, 43);
+    record.side = SIDE_DELIST;
+    record.company_id = 1;
+    record.quantity = 2;
+    record.realized = -12000;
+    (void)snprintf(record.name, sizeof(record.name), "%s", a.companies[0].name);
+    for (i = 0; i < 35; ++i)
+        history_delist_notice(&a, &record);
+    CHECK(a.delist_notice_count == 30);
+    CHECK(a.delist_notice_total == 35);
+    CHECK(a.delist_notice_loss == 420000);
+    CHECK(game_validate(&a, error, sizeof(error)));
+    (void)snprintf(path, sizeof(path), "%s/notices_v3.sav", directory);
+    CHECK(storage_finish(path, &a, error, sizeof(error)));
+    CHECK(storage_load(path, &b, error, sizeof(error)) == LOAD_OK);
+    CHECK(!memcmp(&a, &b, sizeof(a)));
+
+    /* 최대가를 이미 기록한 우량주가 상승 압력을 받아도 보합으로 집계합니다. */
+    game_init(&a, 45);
+    a.fear = 0;
+    for (i = 0; i < COMPANY_COUNT; ++i)
+    {
+        a.companies[i].type = STOCK_BLUE_CHIP;
+        a.companies[i].profit_bp = 1800;
+        a.companies[i].debt_percent = 0;
+        price(&a, i, MAX_PRICE);
+    }
+    stock_prices_update(&a, &report);
+    CHECK(report.rising == 0 && report.falling == 0 && report.sideways == COMPANY_COUNT);
+    for (i = 0; i < COMPANY_COUNT; ++i)
+        CHECK(a.companies[i].last_change_bp == 0);
+}
+
+/* 그래프 실행 검증용입니다. 게임 프로젝트에는 이 명령이 들어가지 않습니다. */
+static int fixture_v3(const char *path)
+{
+    char error[256];
+    game_init(&a, 43);
+    a.companies[0].price_count = 3;
+    a.companies[0].prices[0] = 1001;
+    a.companies[0].prices[1] = 2000000;
+    a.companies[0].prices[2] = a.companies[0].price = 8000000;
+    return storage_finish(path, &a, error, sizeof(error)) ? 0 : 1;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--simulate"))
         return simulate_market();
+    if (argc == 3 && !strcmp(argv[1], "--fixture-v3"))
+        return fixture_v3(argv[2]);
     if (argc == 3 && !strcmp(argv[1], "--dump"))
         return dump_save(argv[2]);
     if (argc == 2 && !strcmp(argv[1], "--console"))
@@ -690,6 +746,7 @@ int main(int argc, char **argv)
     test_fundamentals_and_capacity();
     test_query_and_input();
     test_storage(argv[1]);
+    test_v3_notices(argv[1]);
     printf("PASS: %lu checks; 10,000 full ticks; probabilistic crash; fees, orders, storage.\n",
            checks);
     return 0;

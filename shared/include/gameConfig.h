@@ -2,6 +2,8 @@
 #ifndef GAME_CONFIG_H
 #define GAME_CONFIG_H
 /* All rates are game rules, NOT current Korean legal or broker rates. */
+#define SAVE_PATH "data/game_v4.sav" /* 기존 저장 위치를 이어 사용 */
+#define DELIST_NOTICE_MAX 30 /* 미확인 상세 알림 최대 개수 */
 #define COMPANY_COUNT 30
 #define NAME_SIZE 64
 #define SECTOR_COUNT 5
@@ -9,7 +11,7 @@
 #define ORDER_MAX 64          /* 동시에 유지할 미체결 주문 최대 개수 */
 #define TRADE_HISTORY_MAX 256 /* 최근 체결·폐지 기록 개수 */
 #define ASSET_HISTORY_MAX 128 /* 최근 자산 변화 기록 개수 */
-#define TICK_MS UINT32_C(30000)
+#define TICK_MS UINT32_C(10000) /* V3: 일반용 가격 갱신 간격 10초 */
 #define INITIAL_CASH INT64_C(10000000)
 #define DELIST_PRICE INT64_C(1000)
 #define MAX_PRICE INT64_C(1000000000000)
@@ -18,6 +20,6 @@
 #define FEE_BP 5            /* 매수·매도 수수료 각각 0.05%. 실제 제도가 아닌 게임용 */
 #define SELL_TAX_BP 15      /* 매도세 0.15%. 금액은 각 비용별 원 단위 올림 */
 #define FINANCE_INTERVAL 10 /* 재무 정보는 가격 갱신 10회마다 변경 */
-#define SAVE_VERSION 4U
+#define SAVE_VERSION 5U /* 프로그램 V3의 저장 형식 번호. 프로그램 버전과 별개 */
 #define MARKET_DURATION_MAX 13 /* 장세 하나의 최대 갱신 횟수 */
 #endif

@@ -11,7 +11,7 @@ pause
 popd
 exit /b %game_result%
 :missing
-echo Build the V2 solution first.
+echo Build the solution with build.cmd first.
 pause
 popd
 exit /b 1

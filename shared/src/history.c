@@ -12,8 +12,8 @@
  * 사전 검증을 거칩니다.
  * 매개변수:
  * - a: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
- * - b: 바이너리 버퍼 주소(현재 위치·끝·성공 여부 포함).
- * 반환: 위 설명의 계산값·위치·처리 결과. 특수값의 의미도 위 설명을 확인합니다.
+ * - b: a에 더할 손익 또는 비용 값. 음수도 가능합니다.
+ * 반환: a+b를 -MAX_MONEY부터 MAX_MONEY 사이로 제한한 정수 금액.
  */
 int64_t bounded_add(int64_t a, int64_t b)
 {
@@ -29,7 +29,7 @@ int64_t bounded_add(int64_t a, int64_t b)
  * 합니다.
  * 매개변수:
  * - company: 회사 구조체 주소. 가격·회사 이력을 읽거나 변경합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void history_price(Company *company)
 {
@@ -47,7 +47,7 @@ void history_price(Company *company)
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
  * - record: 아래 처리에서 사용하는 입력 값입니다. 형식·단위는 선언과 계산식을 함께 확인합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void history_trade(Game *game, const TradeRecord *record)
 {
@@ -64,7 +64,7 @@ void history_trade(Game *game, const TradeRecord *record)
  * 상한값을 기록합니다.
  * 매개변수:
  * - game: 현재 게임 상태의 주소. const이면 읽기만 합니다.
- * 반환: 없음. 필요한 출력은 전달받은 구조체·버퍼에 기록합니다.
+ * 반환: 없음(void). 처리 결과는 이 함수가 수정하는 상태와 호출한 함수를 확인합니다.
  */
 void history_asset(Game *game)
 {
@@ -78,4 +78,21 @@ void history_asset(Game *game)
         --game->asset_count;
     }
     game->assets[game->asset_count++] = record;
+}
+
+/* [관련 모듈] trade.c → history.c → saveLoad.c/screenOut.c
+ * 보유 주식이 폐지될 때만 호출합니다. 고정 배열을 쓰므로 기록이 무한히 늘지 않습니다.
+ * 오래된 상세가 빠져도 확인 전 전체 건수와 손실 합계는 남습니다. */
+void history_delist_notice(Game *game, const TradeRecord *record)
+{
+    if (game->delist_notice_count == DELIST_NOTICE_MAX)
+    {
+        memmove(game->delist_notices, game->delist_notices + 1,
+                (DELIST_NOTICE_MAX - 1) * sizeof(TradeRecord));
+        --game->delist_notice_count;
+    }
+    game->delist_notices[game->delist_notice_count++] = *record;
+    if (game->delist_notice_total < UINT64_MAX)
+        ++game->delist_notice_total;
+    game->delist_notice_loss = bounded_add(game->delist_notice_loss, -record->realized);
 }
