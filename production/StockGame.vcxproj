@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build" ToolsVersion="16.0">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{7AA25F58-7B67-4DB8-9C4C-D1FAED5A1010}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>StockGame</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)/Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)/Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)bin/$(Configuration)/</OutDir>
+    <IntDir>$(ProjectDir)build/$(ProjectName)/$(Configuration)/</IntDir>
+    <TargetName>stock_game</TargetName>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)../shared/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <CompileAs>CompileAsC</CompileAs>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <Optimization>Disabled</Optimization>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)../shared/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <CompileAs>CompileAsC</CompileAs>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <Optimization>MaxSpeed</Optimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="../shared/src/company.c" />
+    <ClCompile Include="../shared/src/gameControl.c" />
+    <ClCompile Include="../shared/src/history.c" />
+    <ClCompile Include="../shared/src/input.c" />
+    <ClCompile Include="../shared/src/listing.c" />
+    <ClCompile Include="../shared/src/market.c" />
+    <ClCompile Include="../shared/src/order.c" />
+    <ClCompile Include="../shared/src/portfolio.c" />
+    <ClCompile Include="../shared/src/random.c" />
+    <ClCompile Include="../shared/src/saveLoad.c" />
+    <ClCompile Include="../shared/src/screenOut.c" />
+    <ClCompile Include="../shared/src/session.c" />
+    <ClCompile Include="../shared/src/stockPrice.c" />
+    <ClCompile Include="../shared/src/stockQuery.c" />
+    <ClCompile Include="../shared/src/trade.c" />
+    <ClCompile Include="main.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="../shared/include/common.h" />
+    <ClInclude Include="../shared/include/company.h" />
+    <ClInclude Include="../shared/include/gameConfig.h" />
+    <ClInclude Include="../shared/include/gameControl.h" />
+    <ClInclude Include="../shared/include/gameData.h" />
+    <ClInclude Include="../shared/include/history.h" />
+    <ClInclude Include="../shared/include/input.h" />
+    <ClInclude Include="../shared/include/listing.h" />
+    <ClInclude Include="../shared/include/market.h" />
+    <ClInclude Include="../shared/include/order.h" />
+    <ClInclude Include="../shared/include/portfolio.h" />
+    <ClInclude Include="../shared/include/random.h" />
+    <ClInclude Include="../shared/include/saveLoad.h" />
+    <ClInclude Include="../shared/include/screenOut.h" />
+    <ClInclude Include="../shared/include/session.h" />
+    <ClInclude Include="../shared/include/stockPrice.h" />
+    <ClInclude Include="../shared/include/stockQuery.h" />
+    <ClInclude Include="../shared/include/trade.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)/Microsoft.Cpp.targets" />
+</Project>

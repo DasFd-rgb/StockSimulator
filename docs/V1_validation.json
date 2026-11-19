@@ -1,0 +1,11 @@
+{
+  "program_version": "V1",
+  "normal_interval_ms": 30000,
+  "demo_interval_ms": 3000,
+  "Debug_checks": 98183,
+  "Release_checks": 98183,
+  "toolset": "v143",
+  "save_format": 4,
+  "save_files_max": 3,
+  "archive_basis": "Preserved initial source, with program and solution labels set to V1."
+}
